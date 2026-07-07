@@ -1,0 +1,45 @@
+{
+  "manifest_version": 2,
+  "name": "Tablist",
+  "version": "0.1.0",
+  "description": "Play selected YouTube tabs as a playlist, one tab after another.",
+  "permissions": [
+    "tabs",
+    "storage",
+    "*://youtube.com/*",
+    "*://www.youtube.com/*",
+    "*://m.youtube.com/*"
+  ],
+  "background": {
+    "scripts": [
+      "src/playlist.js",
+      "src/background.js"
+    ]
+  },
+  "browser_action": {
+    "default_title": "Tablist",
+    "default_popup": "src/popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://youtube.com/watch*",
+        "*://www.youtube.com/watch*",
+        "*://m.youtube.com/watch*",
+        "*://youtube.com/shorts/*",
+        "*://www.youtube.com/shorts/*",
+        "*://m.youtube.com/shorts/*"
+      ],
+      "js": [
+        "src/content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "tablist@stianfro.local",
+      "strict_min_version": "109.0"
+    }
+  }
+}

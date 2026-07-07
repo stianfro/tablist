@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Tablist</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <header class="header">
+      <div>
+        <h1>Tablist</h1>
+        <p>Play selected YouTube tabs in order.</p>
+      </div>
+      <button id="refreshButton" type="button" class="secondary">Refresh</button>
+    </header>
+
+    <p id="statusText" class="status" role="status">Loading YouTube tabs.</p>
+
+    <section class="panel" aria-labelledby="tabsHeading">
+      <div class="panel-heading">
+        <h2 id="tabsHeading">YouTube tabs</h2>
+        <button id="selectAllButton" type="button" class="secondary">Select all</button>
+      </div>
+      <ul id="tabsList" class="list"></ul>
+      <button id="startButton" type="button" class="primary">Start selected</button>
+    </section>
+
+    <section class="panel" aria-labelledby="playlistHeading">
+      <div class="panel-heading">
+        <h2 id="playlistHeading">Playlist</h2>
+        <button id="stopButton" type="button" class="secondary">Stop</button>
+      </div>
+      <ol id="playlistList" class="list ordered"></ol>
+    </section>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

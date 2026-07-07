@@ -1,0 +1,144 @@
+:root {
+  color-scheme: light dark;
+  font: 14px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: Canvas;
+  color: CanvasText;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  width: 380px;
+  margin: 0;
+  padding: 14px;
+}
+
+.header,
+.panel-heading,
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header,
+.panel-heading {
+  justify-content: space-between;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 18px;
+}
+
+h2 {
+  font-size: 15px;
+}
+
+.header p,
+.meta,
+.status {
+  color: color-mix(in srgb, CanvasText 70%, Canvas 30%);
+}
+
+.panel {
+  border: 1px solid color-mix(in srgb, CanvasText 18%, Canvas 82%);
+  border-radius: 10px;
+  margin-top: 12px;
+  padding: 12px;
+}
+
+.status {
+  margin-top: 10px;
+  min-height: 18px;
+}
+
+.status.error {
+  color: #b00020;
+}
+
+.list {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 10px 0;
+  padding: 0;
+}
+
+.ordered {
+  list-style: decimal inside;
+}
+
+.item {
+  border: 1px solid color-mix(in srgb, CanvasText 14%, Canvas 86%);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.item.current {
+  border-color: #3b82f6;
+  background: color-mix(in srgb, #3b82f6 12%, Canvas 88%);
+}
+
+.check-row,
+.playlist-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+}
+
+.title {
+  display: block;
+  font-weight: 600;
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+.meta {
+  display: block;
+  font-size: 12px;
+  margin-top: 3px;
+  word-break: break-all;
+}
+
+button {
+  border: 1px solid color-mix(in srgb, CanvasText 20%, Canvas 80%);
+  border-radius: 7px;
+  cursor: pointer;
+  font: inherit;
+  padding: 6px 10px;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.primary {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: white;
+  width: 100%;
+}
+
+.secondary {
+  background: color-mix(in srgb, CanvasText 8%, Canvas 92%);
+  color: CanvasText;
+}
+
+.row-actions {
+  flex-wrap: wrap;
+  grid-column: 2;
+  margin-top: 8px;
+}
+
+.row-actions button {
+  padding: 4px 7px;
+}
