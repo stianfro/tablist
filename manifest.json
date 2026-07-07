@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Tablist",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Play selected YouTube tabs as a playlist, one tab after another.",
   "permissions": [
     "tabs",

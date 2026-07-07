@@ -1,14 +1,14 @@
 # Tablist
 
-Tablist is a Firefox-first WebExtension that turns selected YouTube tabs into a playlist. It uses the first selected tab as the player tab, then loads each selected video URL there in order when the current video ends.
+Tablist is a Firefox-first WebExtension that turns selected YouTube tabs into a tab-based playlist. It plays the selected tabs in browser tab order and moves to the next selected tab when the current video ends.
 
 ## What it does
 
 - Finds open YouTube watch and Shorts tabs.
 - Lets you select which tabs belong in the playlist.
 - Starts playback from the first selected tab.
-- Keeps playback in one managed player tab so Firefox does not block each playlist step as cross-tab autoplay.
-- Loads the next selected video URL in that player tab when the current video ends.
+- Stops the current managed tab when its video ends.
+- Focuses the next selected tab and starts that tab's video.
 - Tries to turn off YouTube native autoplay while Tablist is managing playback.
 
 ## Install for local testing
@@ -34,4 +34,4 @@ The package task writes a zip file to `dist/`.
 
 ## Notes
 
-YouTube is a single-page app and can change its controls over time. Tablist uses video events for the playlist handoff, and uses a best-effort selector for YouTube autoplay controls. Firefox can reject script-started media playback. If playback is blocked, click play once in the managed YouTube tab and Tablist should continue from there.
+YouTube is a single-page app and can change its controls over time. Tablist uses video events for the playlist handoff, and uses a best-effort selector for YouTube autoplay controls. Firefox can reject script-started media playback. If playback is blocked, click play once in the focused YouTube tab, or allow audio and video autoplay for YouTube in Firefox site permissions.
