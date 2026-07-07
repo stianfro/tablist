@@ -8,6 +8,7 @@
   const defaultState = Object.freeze({
     items: [],
     currentIndex: -1,
+    playerTabId: null,
     status: "idle",
     lastError: null,
     updatedAt: null
@@ -45,8 +46,8 @@
     return state;
   }
 
-  function cloneState() {
-    return JSON.parse(JSON.stringify(state));
+  function cloneState(extra) {
+    return JSON.parse(JSON.stringify({ ...state, ...(extra || {}) }));
   }
 
   async function queryYouTubeTabs() {
@@ -114,6 +115,11 @@
   }
 
   async function stopCurrentTab() {
+    if (typeof state.playerTabId === "number") {
+      await pauseTab(state.playerTabId);
+      return;
+    }
+
     const current = state.items[state.currentIndex];
 
     if (current) {
@@ -133,6 +139,47 @@
     await api.tabs.update(tab.id, { active: true });
   }
 
+  async function getPlayerTab(fallbackItem) {
+    if (typeof state.playerTabId === "number") {
+      const tab = await getTab(state.playerTabId);
+      if (tab) {
+        return tab;
+      }
+    }
+
+    if (fallbackItem && typeof fallbackItem.tabId === "number") {
+      return getTab(fallbackItem.tabId);
+    }
+
+    return null;
+  }
+
+  function playbackUrlForItem(item, playerTab) {
+    return helpers.toPlaybackUrl(item.url, playerTab ? playerTab.url : null);
+  }
+
+  async function askPlayerTabToPlay(tab, item) {
+    await focusTab(tab);
+    await ensureContentScript(tab.id);
+
+    if (helpers.isSamePlayableVideo(tab.url, item.url)) {
+      return api.tabs.sendMessage(tab.id, { type: "TABLIST_PLAY" });
+    }
+
+    return api.tabs.sendMessage(tab.id, {
+      type: "TABLIST_LOAD_AND_PLAY",
+      url: playbackUrlForItem(item, tab)
+    });
+  }
+
+  function playbackBlockedMessage(result) {
+    if (result && result.message) {
+      return result.message;
+    }
+
+    return "Firefox blocked automatic playback. Click play in the focused YouTube tab once, then Tablist can keep using that tab.";
+  }
+
   async function playIndex(index) {
     await ready;
 
@@ -147,50 +194,43 @@
       return cloneState();
     }
 
-    const previous = state.items[state.currentIndex];
     const next = state.items[index];
+    const previousPlayerTabId = state.playerTabId;
+    const playerTab = await getPlayerTab(next);
 
-    if (previous && previous.tabId !== next.tabId) {
-      await pauseTab(previous.tabId);
-    }
-
-    const tab = await getTab(next.tabId);
-
-    if (!tab || !helpers.isPlayableYouTubeUrl(tab.url)) {
+    if (!playerTab) {
       state = {
         ...state,
         currentIndex: index,
+        playerTabId: null,
         status: "waiting",
-        items: helpers.removeItem(state.items, index),
-        lastError: "That YouTube tab is no longer available."
+        lastError: "The player tab is no longer available. Start the playlist again from an open YouTube tab."
       };
-      if (state.currentIndex >= state.items.length) {
-        state.currentIndex = state.items.length - 1;
-      }
       await saveState();
       return cloneState();
+    }
+
+    if (typeof previousPlayerTabId === "number" && previousPlayerTabId !== playerTab.id) {
+      await pauseTab(previousPlayerTabId);
     }
 
     state = {
       ...state,
       currentIndex: index,
+      playerTabId: playerTab.id,
       status: "playing",
-      lastError: null,
-      items: state.items.map((item) => (item.tabId === tab.id ? helpers.updateItemFromTab(item, tab) : item))
+      lastError: null
     };
     await saveState();
 
     try {
-      await focusTab(tab);
-      await ensureContentScript(tab.id);
-      const result = await api.tabs.sendMessage(tab.id, { type: "TABLIST_PLAY" });
+      const result = await askPlayerTabToPlay(playerTab, next);
 
-      if (!result || !result.ok) {
-        const message = result && result.message ? result.message : "Firefox blocked playback. Click play in the YouTube tab to continue.";
+      if (!result || (!result.ok && !result.navigating)) {
         state = {
           ...state,
           status: "waiting",
-          lastError: message
+          lastError: playbackBlockedMessage(result)
         };
         await saveState();
       }
@@ -237,6 +277,7 @@
     state = {
       ...state,
       currentIndex: -1,
+      playerTabId: null,
       status: state.items.length > 0 ? "idle" : "empty",
       lastError: null
     };
@@ -250,7 +291,7 @@
     const wasCurrent = index === state.currentIndex;
 
     if (removed && wasCurrent) {
-      await pauseTab(removed.tabId);
+      await stopCurrentTab();
     }
 
     const items = helpers.removeItem(state.items, index);
@@ -266,6 +307,7 @@
       ...state,
       items,
       currentIndex,
+      playerTabId: wasCurrent ? null : state.playerTabId,
       status: items.length > 0 ? (currentIndex >= 0 ? state.status : "idle") : "empty",
       lastError: null
     };
@@ -281,7 +323,7 @@
     let currentIndex = -1;
 
     if (current) {
-      currentIndex = items.findIndex((item) => item.tabId === current.tabId);
+      currentIndex = items.findIndex((item) => item.tabId === current.tabId && item.url === current.url);
     }
 
     state = {
@@ -296,9 +338,8 @@
 
   async function advanceFromTab(tabId) {
     await ready;
-    const current = state.items[state.currentIndex];
 
-    if (!current || current.tabId !== tabId || state.status !== "playing") {
+    if (state.playerTabId !== tabId || state.status !== "playing") {
       return cloneState();
     }
 
@@ -314,7 +355,24 @@
       return cloneState();
     }
 
-    return playIndex(next);
+    const tab = await getTab(tabId);
+    const item = state.items[next];
+    state = {
+      ...state,
+      currentIndex: next,
+      playerTabId: tabId,
+      status: "playing",
+      lastError: null
+    };
+    await saveState();
+
+    return cloneState({
+      instruction: {
+        type: "TABLIST_LOAD_AND_PLAY",
+        index: next,
+        url: playbackUrlForItem(item, tab)
+      }
+    });
   }
 
   async function refreshPlaylistItems() {
@@ -323,20 +381,43 @@
 
     for (const item of state.items) {
       const tab = await getTab(item.tabId);
-      if (tab && helpers.isPlayableYouTubeUrl(tab.url)) {
+      if (tab && helpers.isSamePlayableVideo(tab.url, item.url)) {
         refreshed.push(helpers.updateItemFromTab(item, tab));
+      } else {
+        refreshed.push(item);
       }
     }
 
     state = {
       ...state,
       items: refreshed,
-      currentIndex: refreshed.findIndex((item) => state.items[state.currentIndex] && item.tabId === state.items[state.currentIndex].tabId),
       status: refreshed.length > 0 ? state.status : "empty"
     };
 
-    if (state.currentIndex < 0 && state.status === "playing") {
-      state.status = "idle";
+    await saveState();
+    return cloneState();
+  }
+
+  async function recordPlaybackResult(message, sender) {
+    await ready;
+    const tabId = sender && sender.tab ? sender.tab.id : null;
+
+    if (tabId !== state.playerTabId) {
+      return cloneState();
+    }
+
+    if (message.ok) {
+      state = {
+        ...state,
+        status: "playing",
+        lastError: null
+      };
+    } else {
+      state = {
+        ...state,
+        status: "waiting",
+        lastError: playbackBlockedMessage(message)
+      };
     }
 
     await saveState();
@@ -375,6 +456,8 @@
         return refreshPlaylistItems();
       case "TABLIST_VIDEO_ENDED":
         return advanceFromTab(sender && sender.tab ? sender.tab.id : null);
+      case "TABLIST_PLAY_RESULT":
+        return recordPlaybackResult(message, sender);
       default:
         return null;
     }
@@ -384,11 +467,18 @@
 
   api.tabs.onRemoved.addListener(async (tabId) => {
     await ready;
-    const index = state.items.findIndex((item) => item.tabId === tabId);
 
-    if (index !== -1) {
-      await removePlaylistItem(index);
+    if (tabId !== state.playerTabId) {
+      return;
     }
+
+    state = {
+      ...state,
+      playerTabId: null,
+      status: state.items.length > 0 ? "waiting" : "empty",
+      lastError: "The player tab was closed. Start the playlist again from an open YouTube tab."
+    };
+    await saveState();
   });
 
   api.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
@@ -398,15 +488,15 @@
       return;
     }
 
-    const index = state.items.findIndex((item) => item.tabId === tabId);
-
-    if (index === -1) {
-      return;
-    }
-
     state = {
       ...state,
-      items: state.items.map((item) => (item.tabId === tabId ? helpers.updateItemFromTab(item, tab) : item))
+      items: state.items.map((item) => {
+        if (item.tabId !== tabId || !helpers.isSamePlayableVideo(tab.url, item.url)) {
+          return item;
+        }
+
+        return helpers.updateItemFromTab(item, tab);
+      })
     };
     await saveState();
   });

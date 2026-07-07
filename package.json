@@ -1,6 +1,6 @@
 {
   "name": "tablist",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Firefox extension that plays selected YouTube tabs as a playlist.",
   "type": "commonjs",

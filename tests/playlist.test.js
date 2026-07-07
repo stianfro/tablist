@@ -68,3 +68,31 @@ test("updates an item from a browser tab", () => {
     url: "https://www.youtube.com/watch?v=new"
   });
 });
+
+test("compares playable video URLs by video identity", () => {
+  assert.equal(
+    playlist.isSamePlayableVideo("https://www.youtube.com/watch?v=abc123&t=4", "https://m.youtube.com/watch?v=abc123&list=queue"),
+    true
+  );
+  assert.equal(
+    playlist.isSamePlayableVideo("https://www.youtube.com/shorts/abc123", "https://m.youtube.com/shorts/abc123?feature=share"),
+    true
+  );
+  assert.equal(
+    playlist.isSamePlayableVideo("https://www.youtube.com/watch?v=abc123", "https://www.youtube.com/watch?v=other"),
+    false
+  );
+});
+
+test("builds a playback URL for the current player host", () => {
+  const playbackUrl = playlist.toPlaybackUrl(
+    "https://m.youtube.com/watch?v=abc123&list=queue",
+    "https://www.youtube.com/watch?v=player"
+  );
+  const parsed = new URL(playbackUrl);
+
+  assert.equal(parsed.hostname, "www.youtube.com");
+  assert.equal(parsed.searchParams.get("v"), "abc123");
+  assert.equal(parsed.searchParams.get("autoplay"), "1");
+  assert.equal(parsed.searchParams.has("list"), false);
+});

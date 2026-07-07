@@ -154,7 +154,7 @@
     }
 
     if (status === "waiting") {
-      setStatus("Waiting for playback. Click play in the focused YouTube tab if Firefox blocked it.", false);
+      setStatus("Waiting for playback. Click play once in the managed YouTube tab if Firefox blocked it.", false);
       return;
     }
 

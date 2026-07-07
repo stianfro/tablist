@@ -24,6 +24,26 @@
     return hostname === "youtube.com" || hostname.endsWith(".youtube.com");
   }
 
+  function playableVideoKey(value) {
+    const url = safeUrl(value);
+
+    if (!url || !isYouTubeHost(url.hostname)) {
+      return null;
+    }
+
+    if (url.pathname === "/watch") {
+      const videoId = url.searchParams.get("v");
+      return videoId ? `watch:${videoId}` : null;
+    }
+
+    if (url.pathname.startsWith("/shorts/")) {
+      const parts = url.pathname.split("/").filter(Boolean);
+      return parts.length >= 2 ? `shorts:${parts[1]}` : null;
+    }
+
+    return null;
+  }
+
   function isPlayableYouTubeUrl(value) {
     const url = safeUrl(value);
 
@@ -39,15 +59,43 @@
       return false;
     }
 
-    if (url.pathname === "/watch") {
-      return Boolean(url.searchParams.get("v"));
+    return Boolean(playableVideoKey(value));
+  }
+
+  function isSamePlayableVideo(left, right) {
+    const leftKey = playableVideoKey(left);
+    return Boolean(leftKey && leftKey === playableVideoKey(right));
+  }
+
+  function toPlaybackUrl(value, playerUrl) {
+    const target = safeUrl(value);
+
+    if (!target) {
+      return value;
     }
 
-    if (url.pathname.startsWith("/shorts/")) {
-      return url.pathname.split("/").filter(Boolean).length >= 2;
+    const player = safeUrl(playerUrl);
+
+    if (player && isYouTubeHost(player.hostname) && isYouTubeHost(target.hostname)) {
+      target.protocol = player.protocol;
+      target.hostname = player.hostname;
+      target.port = player.port;
     }
 
-    return false;
+    const clean = new URL(`${target.protocol}//${target.host}`);
+
+    if (target.pathname === "/watch") {
+      clean.pathname = "/watch";
+      clean.searchParams.set("v", target.searchParams.get("v"));
+    } else if (target.pathname.startsWith("/shorts/")) {
+      const parts = target.pathname.split("/").filter(Boolean);
+      clean.pathname = `/${parts.slice(0, 2).join("/")}`;
+    } else {
+      clean.pathname = target.pathname;
+    }
+
+    clean.searchParams.set("autoplay", "1");
+    return clean.toString();
   }
 
   function tabToPlaylistItem(tab) {
@@ -134,11 +182,13 @@
 
   return {
     isPlayableYouTubeUrl,
+    isSamePlayableVideo,
     moveItem,
     nextIndex,
     normalizePlaylist,
     removeItem,
     tabToPlaylistItem,
+    toPlaybackUrl,
     updateItemFromTab
   };
 });

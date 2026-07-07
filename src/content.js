@@ -7,6 +7,7 @@
   globalThis.__tablistContentScriptLoaded = true;
 
   const api = browser;
+  const PENDING_PLAY_KEY = "tablistPendingPlay";
   const state = {
     managed: false,
     video: null,
@@ -23,11 +24,11 @@
     try {
       const result = api.runtime.sendMessage(message);
       if (result && typeof result.catch === "function") {
-        result.catch(() => {});
+        return result.catch(() => null);
       }
-      return result;
+      return Promise.resolve(result);
     } catch (_error) {
-      return null;
+      return Promise.resolve(null);
     }
   }
 
@@ -108,6 +109,26 @@
     state.endedHandler = null;
   }
 
+  async function handleManagedEnd(video) {
+    if (!state.managed) {
+      return;
+    }
+
+    disableNativeAutoplay();
+    video.pause();
+
+    const response = await sendMessage({
+      type: "TABLIST_VIDEO_ENDED",
+      url: location.href,
+      title: document.title
+    });
+
+    const instruction = response && response.instruction;
+    if (instruction && instruction.type === "TABLIST_LOAD_AND_PLAY" && instruction.url) {
+      await loadAndPlay(instruction.url);
+    }
+  }
+
   function attachVideoHandler() {
     const video = getVideo();
 
@@ -119,16 +140,12 @@
 
     state.video = video;
     state.endedHandler = () => {
-      if (!state.managed) {
-        return;
-      }
-
-      disableNativeAutoplay();
-      video.pause();
-      sendMessage({
-        type: "TABLIST_VIDEO_ENDED",
-        url: location.href,
-        title: document.title
+      handleManagedEnd(video).catch((error) => {
+        sendMessage({
+          type: "TABLIST_PLAY_RESULT",
+          ok: false,
+          message: error && error.message ? error.message : "Could not move to the next playlist item."
+        });
       });
     };
 
@@ -178,6 +195,70 @@
     state.observer.observe(document.documentElement, {
       childList: true,
       subtree: true
+    });
+  }
+
+  function readPendingPlay() {
+    try {
+      const raw = sessionStorage.getItem(PENDING_PLAY_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function writePendingPlay(url) {
+    try {
+      sessionStorage.setItem(PENDING_PLAY_KEY, JSON.stringify({
+        url,
+        createdAt: Date.now()
+      }));
+    } catch (_error) {
+      // Session storage can be unavailable in rare private browsing states.
+    }
+  }
+
+  function clearPendingPlay() {
+    try {
+      sessionStorage.removeItem(PENDING_PLAY_KEY);
+    } catch (_error) {
+      // Session storage can be unavailable in rare private browsing states.
+    }
+  }
+
+  function videoKey(value) {
+    let url;
+
+    try {
+      url = new URL(value, location.href);
+    } catch (_error) {
+      return null;
+    }
+
+    if (url.pathname === "/watch") {
+      const id = url.searchParams.get("v");
+      return id ? `watch:${id}` : null;
+    }
+
+    if (url.pathname.startsWith("/shorts/")) {
+      const parts = url.pathname.split("/").filter(Boolean);
+      return parts.length >= 2 ? `shorts:${parts[1]}` : null;
+    }
+
+    return null;
+  }
+
+  function isCurrentVideoUrl(url) {
+    const currentKey = videoKey(location.href);
+    return Boolean(currentKey && currentKey === videoKey(url));
+  }
+
+  function reportPlayResult(result) {
+    return sendMessage({
+      type: "TABLIST_PLAY_RESULT",
+      ok: Boolean(result && result.ok),
+      message: result && result.message ? result.message : null,
+      video: result && result.video ? result.video : null
     });
   }
 
@@ -232,6 +313,47 @@
     }
   }
 
+  async function loadAndPlay(url) {
+    state.managed = true;
+    startAutoplayGuard();
+    startObserver();
+    disableNativeAutoplay();
+
+    if (!isCurrentVideoUrl(url)) {
+      writePendingPlay(url);
+      location.assign(url);
+      return {
+        ok: true,
+        navigating: true
+      };
+    }
+
+    clearPendingPlay();
+    const result = await playManaged();
+    await reportPlayResult(result);
+    return result;
+  }
+
+  async function resumePendingPlay() {
+    const pending = readPendingPlay();
+
+    if (!pending || !pending.url) {
+      return;
+    }
+
+    if (pending.createdAt && Date.now() - pending.createdAt > 120000) {
+      clearPendingPlay();
+      return;
+    }
+
+    if (!isCurrentVideoUrl(pending.url)) {
+      return;
+    }
+
+    await sleep(500);
+    await loadAndPlay(pending.url);
+  }
+
   async function pauseManaged() {
     const video = attachVideoHandler();
 
@@ -259,6 +381,8 @@
         });
       case "TABLIST_PLAY":
         return playManaged();
+      case "TABLIST_LOAD_AND_PLAY":
+        return loadAndPlay(message.url);
       case "TABLIST_PAUSE":
         return pauseManaged();
       default:
@@ -269,4 +393,10 @@
   startAutoplayGuard();
   startObserver();
   attachVideoHandler();
+  resumePendingPlay().catch((error) => {
+    reportPlayResult({
+      ok: false,
+      message: error && error.message ? error.message : "Could not resume playlist playback after navigation."
+    });
+  });
 })();
