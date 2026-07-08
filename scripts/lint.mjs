@@ -61,6 +61,35 @@ function checkTextFile(file, content) {
   }
 }
 
+function parseVersionParts(value) {
+  if (typeof value !== "string") {
+    return [];
+  }
+
+  return value.split(".").map((part) => Number.parseInt(part, 10));
+}
+
+function isAtLeastVersion(value, minimum) {
+  const parts = parseVersionParts(value);
+  const minimumParts = parseVersionParts(minimum);
+  const length = Math.max(parts.length, minimumParts.length);
+
+  for (let index = 0; index < length; index += 1) {
+    const part = Number.isFinite(parts[index]) ? parts[index] : 0;
+    const minimumPart = Number.isFinite(minimumParts[index]) ? minimumParts[index] : 0;
+
+    if (part > minimumPart) {
+      return true;
+    }
+
+    if (part < minimumPart) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 async function validateManifest() {
   const manifest = JSON.parse(await readFile(path.join(root, "manifest.json"), "utf8"));
 
@@ -84,6 +113,15 @@ async function validateManifest() {
   if (!geckoSettings || !geckoSettings.data_collection_permissions) {
     fail("manifest.json must declare Firefox data_collection_permissions.");
     return;
+  }
+
+  if (!isAtLeastVersion(geckoSettings.strict_min_version, "140.0")) {
+    fail("manifest.json gecko.strict_min_version must be at least 140.0 for data_collection_permissions.");
+  }
+
+  const geckoAndroidSettings = manifest.browser_specific_settings && manifest.browser_specific_settings.gecko_android;
+  if (!geckoAndroidSettings || !isAtLeastVersion(geckoAndroidSettings.strict_min_version, "142.0")) {
+    fail("manifest.json gecko_android.strict_min_version must be at least 142.0 for data_collection_permissions.");
   }
 
   const dataCollectionPermissions = geckoSettings.data_collection_permissions;
