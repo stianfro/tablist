@@ -5,12 +5,23 @@ Tablist is a Firefox-first WebExtension that turns selected YouTube tabs into a 
 ## Install from GitHub release
 
 1. Open the latest release: <https://github.com/stianfro/tablist/releases/latest>
+2. Download the signed `.xpi` file from the release assets, for example `tablist-0.1.2.xpi`.
+3. Open the downloaded `.xpi` file in Firefox, or drag it into a Firefox window.
+4. Confirm the install prompt.
+
+Use the signed `.xpi` for normal installs. The `.zip` file is the unsigned source package used for AMO submission and temporary development installs.
+
+Tablist requires Firefox 140 or newer. Firefox for Android requires version 142 or newer.
+
+## Temporary development install
+
+1. Open the latest release: <https://github.com/stianfro/tablist/releases/latest>
 2. Download `tablist-0.1.2.zip` from the release assets.
 3. Open `about:debugging#/runtime/this-firefox` in Firefox.
 4. Click **Load Temporary Add-on**.
 5. Select the downloaded zip file. If Firefox does not accept the zip, unzip it and select `manifest.json` from the extracted folder.
 
-Firefox temporary add-ons are removed when Firefox restarts. A normal permanent install needs a signed add-on package.
+Firefox temporary add-ons are removed when Firefox restarts.
 
 ## Required Firefox autoplay setting
 
@@ -69,5 +80,8 @@ The package task writes a zip file to `dist/`.
 ## Release
 
 1. Update the version in `manifest.json` and `package.json`.
-2. Run `just package`.
-3. Create a GitHub release and upload the zip from `dist/`.
+2. Run `just package`. This writes the unsigned AMO submission zip to `dist/`.
+3. Submit the zip to addons.mozilla.org for self-distribution signing.
+4. After AMO approves it, download the signed `.xpi` from AMO Developer Hub.
+5. Create or update the GitHub release and upload the signed `.xpi` as the install package.
+6. Upload the unsigned zip only when you also want to provide the source package used for AMO submission.
