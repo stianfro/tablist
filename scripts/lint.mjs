@@ -79,6 +79,26 @@ async function validateManifest() {
   if (!manifest.content_scripts || manifest.content_scripts.length === 0) {
     fail("manifest.json must declare a YouTube content script.");
   }
+
+  const geckoSettings = manifest.browser_specific_settings && manifest.browser_specific_settings.gecko;
+  if (!geckoSettings || !geckoSettings.data_collection_permissions) {
+    fail("manifest.json must declare Firefox data_collection_permissions.");
+    return;
+  }
+
+  const dataCollectionPermissions = geckoSettings.data_collection_permissions;
+  if (!Array.isArray(dataCollectionPermissions.required)) {
+    fail("manifest.json data_collection_permissions.required must be an array.");
+  } else if (dataCollectionPermissions.required.length !== 1 || dataCollectionPermissions.required[0] !== "none") {
+    fail("manifest.json must declare no external data collection with required data_collection_permissions set to none.");
+  }
+
+  if (
+    Object.hasOwn(dataCollectionPermissions, "optional") &&
+    (!Array.isArray(dataCollectionPermissions.optional) || dataCollectionPermissions.optional.length !== 0)
+  ) {
+    fail("manifest.json data_collection_permissions.optional must be omitted or empty.");
+  }
 }
 
 await validateJson("manifest.json");
